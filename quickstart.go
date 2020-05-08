@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -69,6 +70,28 @@ func saveToken(path string, token *oauth2.Token) {
 	json.NewEncoder(f).Encode(token)
 }
 
+func getMessage(service *gmail.Service, user string, msgId string) string {
+	r, err := service.Users.Messages.Get(user, msgId).Do()
+	if err != nil {
+		log.Fatalf("Unable to retrieve message: %v", err)
+	}
+
+	encoded := r.Payload.Body.Data
+	decoded, err := base64.StdEncoding.DecodeString(string(encoded))
+	if err != nil {
+		log.Fatalf("Unable to decode message: %v", err)
+	}
+	messagePartBody := string(decoded)
+	if len(messagePartBody) == 0 {
+		return string("No message found in body")
+	}
+
+	return messagePartBody
+
+}
+
+// Creates a message for email
+
 func main() {
 	b, err := ioutil.ReadFile("credentials.json")
 	if err != nil {
@@ -88,16 +111,34 @@ func main() {
 	}
 
 	user := "me"
-	r, err := srv.Users.Labels.List(user).Do()
+	/*
+		r, err := srv.Users.Labels.List(user).Do()
+		if err != nil {
+			log.Fatalf("Unable to retrieve labels: %v", err)
+		}
+		if len(r.Labels) == 0 {
+			fmt.Println("No labels found.")
+			return
+		}
+		fmt.Println("Labels:")
+		for _, l := range r.Labels {
+			fmt.Printf("- %s\n", l.Name)
+		}
+	*/
+
+	r, err := srv.Users.Messages.List(user).Do()
 	if err != nil {
-		log.Fatalf("Unable to retrieve labels: %v", err)
+		log.Fatalf("Unable to retrieve messages: %v", err)
 	}
-	if len(r.Labels) == 0 {
-		fmt.Println("No labels found.")
+	if len(r.Messages) == 0 {
+		fmt.Println("No messages found.")
 		return
 	}
-	fmt.Println("Labels:")
-	for _, l := range r.Labels {
-		fmt.Printf("- %s\n", l.Name)
+	fmt.Println("Messages:")
+	for _, m := range r.Messages {
+
+		message := getMessage(srv, user, m.Id)
+		fmt.Println(message)
 	}
+
 }
